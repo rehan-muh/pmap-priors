@@ -111,7 +111,15 @@
   .card { margin-bottom: 18px; }
   .card h3 { margin: 0 0 4px; font: 700 19px/1.25 var(--serif); color: var(--navy); }
   .card .sub { color: var(--slate); font: 400 14.5px/1.4 var(--sans); margin: 0 0 10px; }
+  .plot-wrap { position: relative; }
   #plot, #plot3d { width: 100%; height: auto; display: block; background: var(--panel); border-radius: 10px; }
+  .plot-wrap .fs-bar { display: none; }
+  .plot-wrap.is-fs { background: #fff; display: flex; flex-direction: column; }
+  .plot-wrap.is-fs .fs-bar { display: flex; align-items: baseline; gap: 16px; padding: 14px 24px 6px; font: 400 15px/1.4 var(--sans); color: var(--slate); }
+  .plot-wrap.is-fs .fs-bar b { font: 700 19px/1.2 var(--serif); color: var(--navy); }
+  .plot-wrap.is-fs .fs-bar button { margin-left: auto; }
+  .plot-wrap.is-fs #plot, .plot-wrap.is-fs #plot3d { flex: 1; width: 100%; height: 100%; min-height: 0; border-radius: 0; background: #fff; }
+  .plot-wrap.fs-fallback { position: fixed; inset: 0; z-index: 50; }
   #plot3d { cursor: grab; touch-action: none; user-select: none; }
   #plot3d.dragging { cursor: grabbing; }
   svg text { font-family: var(--serif); }
@@ -224,12 +232,18 @@
       <div class="card">
         <h3>Space</h3>
         <p class="sub" id="plotHint"></p>
-        <svg id="plot" viewBox="0 0 820 470" role="img" aria-label="Two-dimensional perceptual space"></svg>
-        <svg id="plot3d" viewBox="0 0 820 470" style="display:none" role="img" aria-label="Three-dimensional perceptual space"></svg>
+        <div class="plot-wrap" id="plotWrap">
+          <div class="fs-bar"><b id="fsTitle"></b><span id="fsHint"></span>
+            <button class="action ghost" style="padding:5px 10px; font-size:13.5px" onclick="toggleFullscreen()">Close</button></div>
+          <svg id="plot" viewBox="0 0 820 470" role="img" aria-label="Two-dimensional perceptual space"></svg>
+          <svg id="plot3d" viewBox="0 0 820 470" style="display:none" role="img" aria-label="Three-dimensional perceptual space"></svg>
+        </div>
         <div class="plot-tools">
           <div class="hint" id="plotCoords"></div>
           <button class="action ghost" id="resetView" style="display:none; padding:5px 10px; font-size:13.5px"
             onclick="resetView()">Reset view</button>
+          <button class="action ghost" id="fsBtn" style="padding:5px 10px; font-size:13.5px"
+            onclick="toggleFullscreen()">Full screen</button>
         </div>
       </div>
 
@@ -767,6 +781,31 @@ for (const el of document.querySelectorAll("[data-meta]"))
     ? DATA.meta[el.dataset.meta].toLocaleString("en-US") : DATA.meta[el.dataset.meta];
 for (const el of document.querySelectorAll("[data-stress]"))
   el.textContent = DATA.stress[el.dataset.stress].toFixed(2);
+
+// ---- full-screen view of the space -----------------------------------------
+function toggleFullscreen() {
+  const wrap = $("plotWrap");
+  const fsEl = document.fullscreenElement;
+  if (fsEl === wrap) { document.exitFullscreen(); return; }
+  if (wrap.classList.contains("fs-fallback")) { setFullscreenState(false); return; }
+  if (wrap.requestFullscreen) {
+    wrap.requestFullscreen().catch(() => { wrap.classList.add("fs-fallback"); setFullscreenState(true); });
+  } else { wrap.classList.add("fs-fallback"); setFullscreenState(true); }
+}
+function setFullscreenState(on) {
+  const wrap = $("plotWrap");
+  wrap.classList.toggle("is-fs", on);
+  if (!on) wrap.classList.remove("fs-fallback");
+  if (on) {
+    const st = currentState();
+    $("fsTitle").textContent = (st.c === "consonant" ? "Consonant" : "Vowel") + " space, " + (st.d === "d2" ? "2-D" : "3-D");
+    $("fsHint").textContent = ($("plotCoords").textContent || "") + " Esc closes.";
+  }
+  $("fsBtn").textContent = on ? "Exit full screen" : "Full screen";
+  drawPlot(currentState());
+}
+document.addEventListener("fullscreenchange", () => setFullscreenState(document.fullscreenElement === $("plotWrap")));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("plotWrap").classList.contains("fs-fallback")) setFullscreenState(false); });
 
 let resizeTimer = null;
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => drawPlot(currentState()), 120); });
